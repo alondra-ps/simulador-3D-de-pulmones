@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Los Pulmones y la Respiración · Simulador 3D Interactivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ============ PALETA Y BASE ============ */
+:root{
+  --bg0:#070d18; --bg1:#0c1526; --surface:#101c31; --surface2:#152540; --line:#24385a;
+  --ink:#eaf2ff; --muted:#94a9c9;
+  --blue:#38bdf8; --blue2:#4da3ff; --amber:#fbbf24; --fire:#f472b6; --fire2:#e11d48;
+  --teal:#5eead4; --green:#4ade80; --purple:#c084fc; --lime:#a3e635;
+  --grad-fire:linear-gradient(135deg,#f472b6,#e11d48);
+  --grad-blue:linear-gradient(135deg,#4da3ff,#38bdf8);
+  --font-d:'Chakra Petch',system-ui,sans-serif; --font-b:'Inter',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font-b); background:var(--bg0); color:var(--ink);
+  overflow:hidden; font-size:14px; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#38bdf8,#f472b6);border-radius:8px;border:2px solid var(--bg1)}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#7dd3fc,#f9a8d4)}
+*{scrollbar-width:thin;scrollbar-color:#38bdf8 var(--bg1)}
+
+#app{display:grid;grid-template-columns:1fr 336px;grid-template-rows:60px 1fr;height:100vh;height:100dvh}
+
+/* ============ CABECERA ============ */
+header{
+  grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;
+  background:linear-gradient(90deg,#0c1930,#0b1426 55%,#1b0f1c);
+  border-bottom:1px solid var(--line);position:relative;z-index:30;
+  animation:dropIn .6s cubic-bezier(.2,.9,.3,1) both;
+}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,var(--blue),var(--teal) 35%,var(--fire) 75%,var(--amber));opacity:.85}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand svg{flex:none}
+.brand .lung-anim{transform-origin:17px 14px;animation:lungBreath 2.4s ease-in-out infinite}
+@keyframes lungBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.09,1.06)}}
+.brand h1{font-family:var(--font-d);font-size:19px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.brand h1 em{font-style:normal;color:var(--fire)}
+.brand p{font-size:11px;color:var(--muted);white-space:nowrap}
+.cycle-chip{font-family:var(--font-d);font-size:11px;color:var(--teal);border:1px solid #245666;
+  background:#0d2130;padding:4px 10px;border-radius:99px;white-space:nowrap}
+header .spacer{flex:1}
+.hbtn{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--line);
+  border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.18s}
+.hbtn:hover{border-color:var(--blue2);transform:translateY(-1px);box-shadow:0 4px 16px #4da3ff33}
+.hbtn.off{color:var(--muted)}
+.hbtn.off .on-ic{display:none}.hbtn:not(.off) .off-ic{display:none}
+.hbtn svg{width:16px;height:16px}
+
+/* ============ ESCENARIO 3D ============ */
+#stage{position:relative;overflow:hidden;background:var(--bg0)}
+#viewport{position:absolute;inset:0}
+#viewport canvas{display:block;width:100%;height:100%}
+#grain{position:absolute;inset:0;pointer-events:none;opacity:.05;z-index:3;
+  background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/></filter><rect width="160" height="160" filter="url(%23n)" opacity="0.6"/></svg>')}
+#vignette{position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:radial-gradient(ellipse at 50% 42%,transparent 52%,rgba(4,8,16,.55) 100%)}
+
+/* Etiquetas de piezas */
+#labelsLayer{position:absolute;inset:0;z-index:5;pointer-events:none}
+#leaderSvg{position:absolute;inset:0;width:100%;height:100%}
+.pill{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;
+  font-family:var(--font-d);font-size:11.5px;font-weight:600;letter-spacing:.3px;white-space:nowrap;
+  background:rgba(9,15,28,.88);border:1px solid var(--pc,#38bdf8);color:var(--ink);
+  padding:3px 9px 3px 7px;border-radius:99px;display:flex;align-items:center;gap:6px;
+  box-shadow:0 2px 10px rgba(0,0,0,.5);transition:box-shadow .2s,background .2s;backdrop-filter:blur(4px)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--pc);box-shadow:0 0 6px var(--pc);flex:none}
+.pill:hover,.pill.active{background:#13233f;box-shadow:0 0 0 2px var(--pc),0 0 18px var(--pc)}
+.pill.active{font-weight:700}
+
+/* Insignia de la fase actual */
+#strokeBadge{position:absolute;top:14px;left:14px;z-index:6;display:flex;align-items:center;gap:12px;
+  background:rgba(9,15,28,.82);border:1px solid var(--line);border-left:4px solid var(--sc,var(--blue));
+  border-radius:14px;padding:10px 16px 10px 12px;backdrop-filter:blur(8px);
+  box-shadow:0 6px 24px rgba(0,0,0,.45),0 0 24px color-mix(in srgb,var(--sc,var(--blue)) 22%,transparent);
+  animation:fadeUp .7s .3s cubic-bezier(.2,.9,.3,1) both}
+#strokeBadge .num{font-family:var(--font-d);font-size:26px;font-weight:700;width:44px;height:44px;flex:none;
+  display:grid;place-items:center;border-radius:12px;background:var(--sc,var(--blue));color:#08101f}
+#strokeBadge .name{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:1px;color:var(--sc,var(--blue))}
+#strokeBadge .sub{font-size:10.5px;color:var(--muted)}
+#strokeBadge .dead{font-family:var(--font-d);font-size:10px;font-weight:700;color:#08101f;background:var(--amber);
+  padding:2px 7px;border-radius:6px;margin-left:6px;visibility:hidden}
+#strokeBadge.pop{animation:pop .45s cubic-bezier(.2,.9,.3,1)}
+@keyframes pop{0%{transform:scale(1.07)}100%{transform:scale(1)}}
+
+#hintChip{position:absolute;top:14px;right:14px;z-index:6;font-size:11.5px;color:var(--muted);
+  background:rgba(9,15,28,.75);border:1px solid var(--line);border-radius:99px;padding:7px 13px;
+  backdrop-filter:blur(6px);transition:opacity 1s;animation:fadeUp .7s .5s both}
+#hintChip b{color:var(--ink)}
+
+/* Ficha de pieza */
+#infoCard{position:absolute;left:14px;bottom:122px;z-index:7;width:min(340px,calc(100% - 28px));
+  background:rgba(10,17,31,.92);border:1px solid var(--ic,#38bdf8);border-radius:14px;padding:14px 16px;
+  backdrop-filter:blur(10px);box-shadow:0 10px 34px rgba(0,0,0,.55),0 0 22px color-mix(in srgb,var(--ic,#38bdf8) 20%,transparent);
+  transform:translateY(12px);opacity:0;pointer-events:none;transition:.28s cubic-bezier(.2,.9,.3,1)}
+#infoCard.show{transform:translateY(0);opacity:1;pointer-events:auto}
+#infoCard .eyebrow{font-size:9.5px;letter-spacing:2px;color:var(--ic,#38bdf8);font-weight:800;text-transform:uppercase}
+#infoCard h4{font-family:var(--font-d);font-size:17px;margin:3px 0 6px;display:flex;align-items:center;gap:8px}
+#infoCard h4 i{width:10px;height:10px;border-radius:50%;background:var(--ic);box-shadow:0 0 8px var(--ic)}
+#infoCard p{font-size:12.5px;line-height:1.55;color:#c6d4ea}
+#infoCard .close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--muted);
+  font-size:18px;cursor:pointer;line-height:1;padding:4px}
+#infoCard .close:hover{color:var(--ink)}
+
+/* Línea de tiempo del ciclo */
+#timeline{position:absolute;left:12px;right:12px;bottom:12px;z-index:6;
+  background:rgba(9,14,26,.82);border:1px solid var(--line);border-radius:14px;padding:10px 14px 8px;
+  backdrop-filter:blur(10px);box-shadow:0 8px 30px rgba(0,0,0,.5);animation:fadeUp .7s .45s both}
+.tl-segs{display:flex;gap:4px;position:relative}
+.tl-seg{flex:1;background:none;border:none;cursor:pointer;text-align:left;padding:0 2px;min-width:0}
+.tl-seg .tl-name{font-family:var(--font-d);font-size:11.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;gap:6px;margin-bottom:5px;white-space:nowrap;transition:.2s}
+.tl-seg .tl-name i{font-style:normal;width:16px;height:16px;flex:none;display:grid;place-items:center;
+  border-radius:5px;background:#1b2c49;color:var(--muted);font-size:10px;transition:.2s}
+.tl-seg .tl-bar{display:block;height:9px;border-radius:6px;background:#152340;overflow:hidden;border:1px solid #1e3153}
+.tl-seg .tl-fill{display:block;height:100%;background:var(--sc);transform-origin:left;transform:scaleX(0);border-radius:6px}
+.tl-seg.done .tl-fill{transform:scaleX(1);opacity:.35}
+.tl-seg.done .tl-name{color:#b9c8e2}
+.tl-seg.active .tl-name{color:var(--sc);text-shadow:0 0 12px var(--sc)}
+.tl-seg.active .tl-name i{background:var(--sc);color:#08101f}
+.tl-seg.active .tl-bar{box-shadow:0 0 12px color-mix(in srgb,var(--sc) 55%,transparent)}
+.tl-seg:hover .tl-name{color:var(--ink)}
+#tlMarker{position:absolute;top:16px;bottom:-2px;width:2px;background:#fff;border-radius:2px;
+  box-shadow:0 0 8px #fff;pointer-events:none;left:0}
+#tlMarker::before{content:"";position:absolute;top:-5px;left:-3px;border:4px solid transparent;border-top-color:#fff}
+.tl-ticks{position:relative;height:12px;margin-top:3px;font-family:var(--font-d);font-size:8.5px;color:#5f7398}
+.tl-ticks span{position:absolute;transform:translateX(-50%)}
+.tl-read{display:flex;justify-content:space-between;gap:10px;font-family:var(--font-d);font-size:11px;
+  color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.tl-read b{color:var(--ink)}
+
+/* Cargador / error */
+#loader{position:absolute;inset:0;z-index:20;display:grid;place-items:center;
+  background:radial-gradient(ellipse at 30% 20%,#12233f,#070d18 70%);transition:opacity .6s}
+#loader.done{opacity:0;pointer-events:none}
+.load-box{text-align:center}
+.load-box svg{margin-bottom:14px}
+.load-box .lp{transform-origin:17px 14px;animation:lungBreath 1.4s ease-in-out infinite}
+.load-box h2{font-family:var(--font-d);font-size:18px;letter-spacing:1px}
+.load-box p{color:var(--muted);font-size:12px;margin-top:6px;max-width:320px;line-height:1.5}
+.load-bar{width:180px;height:4px;background:#152340;border-radius:4px;margin:16px auto 0;overflow:hidden}
+.load-bar i{display:block;height:100%;width:40%;border-radius:4px;background:var(--grad-blue);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}
+.load-box .btn{margin-top:16px}
+
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:15;transition:opacity .18s}
+#flash.on{opacity:.7}
+
+/* ============ PANEL DE CONTROL ============ */
+#panel{background:linear-gradient(180deg,#0d1729,#0a1220);border-left:1px solid var(--line);
+  overflow-y:auto;overflow-x:hidden;padding:16px 16px 22px;z-index:10;animation:slideIn .6s .15s cubic-bezier(.2,.9,.3,1) both}
+.sec{margin-bottom:20px}
+.sec-title{font-family:var(--font-d);font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.sec-title::before{content:"";width:14px;height:3px;border-radius:2px;background:var(--grad-fire)}
+.sec-title.blue::before{background:var(--grad-blue)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);
+  border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:.18s;user-select:none}
+.btn:hover{border-color:var(--blue2);transform:translateY(-1px);box-shadow:0 5px 18px #4da3ff2e}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn svg{width:15px;height:15px;flex:none}
+.btn-primary{background:linear-gradient(135deg,#1c3f6e,#173257);border-color:#2f5b96}
+.btn-primary:hover{border-color:var(--blue);box-shadow:0 5px 20px #38bdf84d}
+.btn-fire{background:var(--grad-fire);border-color:#f9a8d4;color:#fff;font-family:var(--font-d);
+  font-size:14px;font-weight:700;letter-spacing:.6px;padding:13px 12px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.btn-fire:hover{box-shadow:0 6px 24px #f472b666;border-color:#fbcfe8}
+.btn-fire.armed{background:linear-gradient(135deg,#1b4d48,#143835);border-color:#5eead4}
+.wide{width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rowcam{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+.ctl-row{margin-top:12px}
+.ctl-lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:600;margin-bottom:7px}
+.ctl-lab output{font-family:var(--font-d);color:var(--blue);font-size:12.5px;font-variant-numeric:tabular-nums}
+.ctl-lab output.fire{color:var(--fire)}
+.ctl-hint{font-size:10.5px;color:#64789c;margin-top:5px;line-height:1.4}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,var(--rc,#38bdf8) var(--p,50%),#152340 var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:#fff;border:3px solid var(--rc,#38bdf8);box-shadow:0 0 10px var(--rc,#38bdf8);cursor:grab;transition:.15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--rc,#38bdf8);box-shadow:0 0 10px var(--rc,#38bdf8);cursor:grab}
+input[type=range]:focus-visible{box-shadow:0 0 0 3px #4da3ff55}
+
+.switch-row{display:flex;justify-content:space-between;align-items:center;padding:8px 2px;font-size:12.5px;font-weight:600;cursor:pointer}
+.switch-row small{display:block;font-weight:400;font-size:10.5px;color:#64789c}
+.switch{position:relative;width:42px;height:23px;flex:none}
+.switch input{position:absolute;opacity:0;inset:0;cursor:pointer;z-index:2}
+.switch i{position:absolute;inset:0;border-radius:99px;background:#1a2b49;border:1px solid var(--line);transition:.2s}
+.switch i::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+  background:#8195b5;transition:.2s cubic-bezier(.2,.9,.3,1)}
+.switch input:checked + i{background:color-mix(in srgb,var(--sw,#38bdf8) 30%,#12233f);border-color:var(--sw,#38bdf8)}
+.switch input:checked + i::after{left:21px;background:var(--sw,#38bdf8);box-shadow:0 0 10px var(--sw,#38bdf8)}
+.switch input:focus-visible + i{box-shadow:0 0 0 3px #4da3ff55}
+
+select{width:100%;background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:10px;
+  padding:9px 10px;font-size:12.5px;font-family:inherit;cursor:pointer;outline:none}
+select:hover{border-color:var(--blue2)}
+
+/* Tarjeta de fase actual */
+#strokeCard{background:linear-gradient(160deg,color-mix(in srgb,var(--sc,#38bdf8) 13%,#0f1c33),#0d1729);
+  border:1px solid color-mix(in srgb,var(--sc,#38bdf8) 45%,#24385a);border-radius:14px;padding:13px 14px;transition:.3s}
+#strokeCard .sc-head{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+#strokeCard .sc-num{font-family:var(--font-d);font-size:20px;font-weight:700;width:34px;height:34px;flex:none;
+  display:grid;place-items:center;border-radius:9px;background:var(--sc,#38bdf8);color:#08101f}
+#strokeCard h4{font-family:var(--font-d);font-size:16px;letter-spacing:.5px;color:var(--sc,#38bdf8)}
+#strokeCard .sc-sub{font-size:10px;color:var(--muted)}
+#strokeCard p{font-size:12.5px;line-height:1.55;color:#cfdbef}
+#strokeCard .sc-tip{margin-top:9px;font-size:11px;line-height:1.45;color:var(--sc,#38bdf8);
+  background:rgba(8,14,26,.55);border-radius:9px;padding:7px 9px;border:1px dashed color-mix(in srgb,var(--sc,#38bdf8) 40%,transparent)}
+
+/* Leyenda de piezas */
+#legend{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.chip{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);
+  border-radius:9px;padding:7px 8px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;text-align:left;min-width:0}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip i{width:8px;height:8px;flex:none;border-radius:50%;background:var(--pc);box-shadow:0 0 6px var(--pc)}
+.chip:hover{border-color:var(--pc);transform:translateY(-1px)}
+.chip.active{border-color:var(--pc);background:#152743;box-shadow:0 0 12px color-mix(in srgb,var(--pc) 35%,transparent)}
+
+.keys{font-size:10.5px;color:#5f7398;line-height:1.7;margin-top:12px}
+.keys b{color:var(--muted);font-family:var(--font-d);background:#152340;border:1px solid var(--line);
+  border-radius:5px;padding:1px 5px;font-size:9.5px}
+
+/* Avisos */
+#toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{font-family:var(--font-d);font-size:12.5px;font-weight:600;background:rgba(13,23,41,.95);
+  border:1px solid var(--blue2);border-radius:99px;padding:9px 18px;box-shadow:0 8px 26px rgba(0,0,0,.5),0 0 16px #4da3ff33;
+  animation:toastIn .3s cubic-bezier(.2,.9,.3,1),toastOut .3s 2.1s both}
+@keyframes toastIn{from{transform:translateY(14px);opacity:0}}
+@keyframes toastOut{to{transform:translateY(8px);opacity:0}}
+
+@keyframes fadeUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes dropIn{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:920px){
+  body{overflow:auto}
+  #app{grid-template-columns:1fr;grid-template-rows:56px 58vh auto;height:auto}
+  #stage{min-height:420px}
+  #panel{border-left:none;border-top:1px solid var(--line);max-height:none}
+  .brand p,.cycle-chip{display:none}
+  .brand h1{font-size:16px}
+  #strokeBadge{padding:7px 11px 7px 9px;gap:9px}
+  #strokeBadge .num{width:34px;height:34px;font-size:19px}
+  #strokeBadge .name{font-size:14px}
+  #hintChip{display:none}
+  .pill{font-size:10px;padding:2px 7px 2px 6px}
+  .tl-seg .tl-name{font-size:9.5px;gap:4px}
+  .tl-seg .tl-name i{width:13px;height:13px;font-size:8.5px}
+  .tl-read{font-size:9.5px}
+  #infoCard{bottom:108px}
+  #timeline{padding:8px 10px 6px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01s !important}
+}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= CABECERA ================= -->
+  <header>
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <path d="M17 3v9" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M17 12l-6 3M17 12l6 3" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+        <g class="lung-anim">
+          <path d="M14 14c-4.5 0-8 4.2-8 10.5 0 2.5 1.4 4.5 3.6 4.5 2.4 0 4.4-2.2 4.4-6.5V14z" fill="#f472b6" fill-opacity=".35" stroke="#f472b6" stroke-width="2"/>
+          <path d="M20 14c4.5 0 8 4.2 8 10.5 0 2.5-1.4 4.5-3.6 4.5-2.4 0-4.4-2.2-4.4-6.5V14z" fill="#fb7185" fill-opacity=".35" stroke="#fb7185" stroke-width="2"/>
+        </g>
+      </svg>
+      <div>
+        <h1>PULMONES Y <em>RESPIRACIÓN</em></h1>
+        <p>Simulador educativo 3D · Aparato respiratorio</p>
+      </div>
+    </div>
+    <span class="cycle-chip">1 ciclo respiratorio = 100% (Inhalar · Intercambio · Exhalar)</span>
+    <div class="spacer"></div>
+    <button class="hbtn" id="soundBtn" aria-label="Activar o silenciar sonido" aria-pressed="true">
+      <svg class="on-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+      <svg class="off-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>
+      <span id="soundLabel">Sonido</span>
+    </button>
+    <button class="hbtn" id="fsBtn" aria-label="Pantalla completa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    </button>
+  </header>
+
+  <!-- ================= ESCENA ================= -->
+  <main id="stage">
+    <div id="viewport"></div>
+    <div id="grain"></div><div id="vignette"></div>
+    <div id="labelsLayer"><svg id="leaderSvg"></svg></div>
+
+    <div id="strokeBadge">
+      <div class="num" id="badgeNum">1</div>
+      <div>
+        <div class="name" id="badgeName">INSPIRACIÓN<span class="dead" id="deadChip">MAX</span></div>
+        <div class="sub" id="badgeSub">Fase 1 de 3 · el diafragma baja y entra aire</div>
+      </div>
+    </div>
+
+    <div id="hintChip">🖱️ <b>Arrastra</b> para girar · <b>Rueda</b> para zoom · <b>Toca una estructura</b> para leer su función</div>
+
+    <div id="infoCard" role="dialog" aria-label="Información de la estructura">
+      <button class="close" id="infoClose" aria-label="Cerrar">×</button>
+      <div class="eyebrow">Estructura respiratoria</div>
+      <h4><i></i><span id="infoName"></span></h4>
+      <p id="infoDesc"></p>
+    </div>
+
+    <div id="timeline">
+      <div class="tl-segs" id="tlSegs">
+        <button class="tl-seg" data-i="0" style="--sc:#38bdf8"><span class="tl-name"><i>1</i>Inspiración</span><span class="tl-bar"><span class="tl-fill"></span></span></button>
+        <button class="tl-seg" data-i="1" style="--sc:#5eead4"><span class="tl-name"><i>2</i>Intercambio</span><span class="tl-bar"><span class="tl-fill"></span></span></button>
+        <button class="tl-seg" data-i="2" style="--sc:#f472b6"><span class="tl-name"><i>3</i>Espiración</span><span class="tl-bar"><span class="tl-fill"></span></span></button>
+        <div id="tlMarker"></div>
+      </div>
+      <div class="tl-ticks">
+        <span style="left:0%">0%</span><span style="left:40%">40%</span><span style="left:60%">60%</span><span style="left:100%">100%</span>
+      </div>
+      <div class="tl-read">
+        <span>Ciclo: <b id="angleTxt">0%</b> / 100% · <b id="lapTxt">Inhalando</b></span>
+        <span><b id="rpmTxt">16 RPM (resp/min)</b> · Respiraciones: <b id="cyclesTxt">0</b> · Pulmón der. = 3 lóbulos / izq. = 2 lóbulos</span>
+      </div>
+    </div>
+
+    <div id="flash"></div>
+    <div id="loader">
+      <div class="load-box" id="loadBox">
+        <svg width="64" height="64" viewBox="0 0 34 34" fill="none">
+          <path d="M17 3v9" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M17 12l-6 3M17 12l6 3" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+          <g class="lp">
+            <path d="M14 14c-4.5 0-8 4.2-8 10.5 0 2.5 1.4 4.5 3.6 4.5 2.4 0 4.4-2.2 4.4-6.5V14z" fill="#f472b6" fill-opacity=".35" stroke="#f472b6" stroke-width="2"/>
+            <path d="M20 14c4.5 0 8 4.2 8 10.5 0 2.5-1.4 4.5-3.6 4.5-2.4 0-4.4-2.2-4.4-6.5V14z" fill="#fb7185" fill-opacity=".35" stroke="#fb7185" stroke-width="2"/>
+          </g>
+        </svg>
+        <h2>PREPARANDO LOS PULMONES…</h2>
+        <p>Cargando el laboratorio 3D del sistema respiratorio.</p>
+        <div class="load-bar"><i></i></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= PANEL ================= -->
+  <aside id="panel">
+    <div class="sec">
+      <h3 class="sec-title">Controles respiratorios</h3>
+      <div class="row2">
+        <button class="btn btn-primary" id="playBtn">
+          <svg id="icPause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          <svg id="icPlay" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 4.5v15l13-7.5z"/></svg>
+          <span id="playLabel">Pausar</span>
+        </button>
+        <button class="btn" id="stepBtn" title="Avanza exactamente una fase respiratoria">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4.5v15l10-7.5z"/><rect x="17" y="4" width="3" height="16" rx="1"/></svg>
+          Siguiente fase
+        </button>
+      </div>
+      <div class="ctl-row">
+        <div class="ctl-lab"><span>Frecuencia respiratoria</span><output id="rpmOut">16 resp/min</output></div>
+        <input type="range" id="rpmSlider" min="4" max="48" step="1" value="16" style="--rc:#38bdf8" aria-label="Frecuencia respiratoria en respiraciones por minuto">
+        <div class="ctl-hint">Ritmo pausado para observar cómo baja el diafragma y ocurre el intercambio gaseoso.</div>
+      </div>
+      <div class="ctl-row">
+        <button class="btn btn-fire wide" id="explodeBtn" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9V3m0 0-3 3m3-3 3 3M12 15v6m0 0-3-3m3 3 3-3M9 12H3m0 0 3-3m-3 3 3 3M15 12h6m0 0-3-3m3 3-3 3"/></svg>
+          <span id="explodeLabel">DESPIECE ANATÓMICO</span>
+        </button>
+      </div>
+      <div class="ctl-row">
+        <div class="ctl-lab"><span>Separación anatómica</span><output class="fire" id="sepOut">0%</output></div>
+        <input type="range" id="sepSlider" min="0" max="100" step="1" value="0" style="--rc:#f472b6" aria-label="Separación del despiece">
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3 class="sec-title blue">Fase actual</h3>
+      <div id="strokeCard">
+        <div class="sc-head">
+          <div class="sc-num" id="scNum">1</div>
+          <div><h4 id="scName" aria-live="polite">Inspiración</h4><div class="sc-sub" id="scSub">0% – 40% · Entrada de O₂</div></div>
+        </div>
+        <p id="scDesc"></p>
+        <div class="sc-tip" id="scTip"></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3 class="sec-title blue">Visualización</h3>
+      <label class="switch-row"><span>Corte alveolar / rayos X<small>Revela bronquiolos, alvéolos y vasos</small></span>
+        <span class="switch" style="--sw:#38bdf8"><input type="checkbox" id="cutToggle" checked><i></i></span></label>
+      <label class="switch-row"><span>Etiquetas de piezas<small>Nombres en español sobre el modelo</small></span>
+        <span class="switch" style="--sw:#a3e635"><input type="checkbox" id="labelsToggle" checked><i></i></span></label>
+      <label class="switch-row"><span>Giro automático<small>La cámara orbita sola</small></span>
+        <span class="switch" style="--sw:#c084fc"><input type="checkbox" id="rotToggle"><i></i></span></label>
+      <div class="ctl-row">
+        <div class="ctl-lab"><span>Calidad gráfica</span></div>
+        <select id="qualitySel" aria-label="Calidad gráfica">
+          <option value="alta">Alta (brillos y sombras)</option>
+          <option value="media" selected>Media (recomendada)</option>
+          <option value="baja">Baja (equipos lentos)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3 class="sec-title blue">Cámara</h3>
+      <div class="rowcam">
+        <button class="btn cam-btn" data-view="front">Frontal</button>
+        <button class="btn cam-btn" data-view="side">Lateral</button>
+        <button class="btn cam-btn" data-view="top">Superior</button>
+        <button class="btn cam-btn" data-view="iso">Isométrica</button>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <button class="btn" id="randomBtn">🎲 Vista sorpresa</button>
+        <button class="btn" id="centerBtn">⟳ Centrar</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3 class="sec-title">Estructuras pulmonares</h3>
+      <div id="legend"></div>
+      <div class="ctl-hint" style="margin-top:8px">Toca una estructura (aquí o en el modelo 3D) para leer su función.</div>
+    </div>
+
+    <div class="sec">
+      <h3 class="sec-title">Acciones</h3>
+      <div class="row2">
+        <button class="btn" id="resetBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          Reiniciar
+        </button>
+        <button class="btn btn-primary" id="shotBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="4"/></svg>
+          Captura PNG
+        </button>
+      </div>
+      <div class="keys">
+        Atajos: <b>Espacio</b> reproducir/pausar · <b>E</b> despiece · <b>→</b> siguiente fase ·
+        <b>C</b> corte/rayos X · <b>L</b> etiquetas · <b>R</b> reiniciar
+      </div>
+    </div>
+  </aside>
+</div>
+<div id="toasts"></div>
+
+<script type="module">
+/* ============================================================
+   SIMULADOR 3D · LOS PULMONES Y LA RESPIRACIÓN
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const RAD = Math.PI/180;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const easeIO=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const smooth=t=>t*t*(3-2*t);
+
+/* ---------- Datos educativos (en español) ---------- */
+const STROKES=[
+ {name:'Inspiración',color:'#38bdf8',sub:'0% – 40% · Entrada de oxígeno',motion:'el diafragma baja y los pulmones se expanden',
+  desc:'El diafragma se contrae y baja, y las costillas se elevan. Eso aumenta el volumen del tórax, baja la presión interna y el aire rico en oxígeno (O₂) entra por la tráquea.',
+  tip:'👀 Observa: el diafragma desciende, los pulmones crecen y las partículas celestes de aire entran.'},
+ {name:'Intercambio',color:'#5eead4',sub:'40% – 60% · O₂ ↔ CO₂ en alvéolos',motion:'difusión de gases en los alvéolos',
+  desc:'En los diminutos sacos alveolares rodeados de capilares, el oxígeno pasa hacia la sangre y el dióxido de carbono (CO₂) pasa desde la sangre hacia el aire pulmonar.',
+  tip:'👀 Observa: los racimos alveolares brillan en verde agua mientras la sangre capilar se oxigena.'},
+ {name:'Espiración',color:'#f472b6',sub:'60% – 100% · Salida de dióxido de carbono',motion:'el diafragma sube y sale el aire',
+  desc:'El diafragma se relaja y sube, reduciendo el espacio torácico. Los pulmones recuperan su tamaño por elasticidad y expulsan el aire con CO₂ hacia el exterior.',
+  tip:'👀 Observa: el diafragma sube, los lóbulos se contraen y salen partículas con CO₂.'}
+];
+
+const PARTS={
+ traquea:{name:'Tráquea',color:'#38bdf8',desc:'Conducto con anillos cartilaginosos que mantiene abierto el paso del aire desde la laringe hasta los bronquios.'},
+ bronquios:{name:'Bronquios principales',color:'#60a5fa',desc:'Dos ramas principales (izquierda y derecha) que llevan el aire desde la tráquea hacia cada pulmón.'},
+ bronquiolos:{name:'Bronquiolos',color:'#818cf8',desc:'Ramificaciones cada vez más finas dentro de los pulmones que distribuyen el aire hasta los alvéolos.'},
+ pulmon_derecho:{name:'Pulmón derecho (3 lóbulos)',color:'#f472b6',desc:'Pulmón ligeramente más ancho y corto que el izquierdo, dividido en tres lóbulos: superior, medio e inferior.'},
+ pulmon_izquierdo:{name:'Pulmón izquierdo (2 lóbulos)',color:'#fb7185',desc:'Pulmón con dos lóbulos (superior e inferior) y una escotadura cardíaca que deja espacio al corazón.'},
+ alveolos:{name:'Alvéolos pulmonares',color:'#5eead4',desc:'Millones de pequeños sacos con paredes muy delgadas donde ocurre el intercambio de oxígeno (O₂) y dióxido de carbono (CO₂).'},
+ capilares:{name:'Red capilar pulmonar',color:'#e11d48',desc:'Finos vasos sanguíneos que rodean los alvéolos para cargar oxígeno y liberar dióxido de carbono.'},
+ diafragma:{name:'Diafragma',color:'#fbbf24',desc:'Músculo en forma de cúpula bajo los pulmones. Al bajar aumenta el volumen torácico para inhalar; al subir ayuda a exhalar.'},
+ caja_toracica:{name:'Caja torácica (costillas)',color:'#cbd5e1',desc:'Estructura ósea de costillas y esternón que protege los pulmones y se expande ligeramente durante la respiración.'}
+};
+const LEGEND_ORDER=['traquea','bronquios','bronquiolos','pulmon_derecho','pulmon_izquierdo','alveolos','capilares','diafragma','caja_toracica'];
+
+/* ---------- Estado global ---------- */
+const state={
+ progress:0, rpm:16, playing:true, cycles:0,
+ explode:0, explodeTarget:0, wasPlaying:true,
+ cutaway:true, labels:true, autoRot:false, sound:true, quality:'media',
+ selected:null, hovered:null, stepMode:false
+};
+
+/* ---------- Avisos ---------- */
+function toast(msg){
+ const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+ $('#toasts').appendChild(t); setTimeout(()=>t.remove(),2500);
+}
+function fatal(msg){
+ $('#loadBox').innerHTML=`<div style="font-size:40px">⚠️</div><h2>NO SE PUDO INICIAR</h2>
+ <p>${msg}</p><button class="btn btn-primary" onclick="location.reload()">Reintentar</button>`;
+ $('#loader').classList.remove('done');
+}
+
+/* ============================================================
+   ARRANQUE (carga de librerías 3D)
+   ============================================================ */
+let THREE,OrbitControls,RoomEnvironment,EffectComposer,RenderPass,UnrealBloomPass,OutputPass;
+try{
+ THREE=await import('three');
+ ({OrbitControls}=await import('three/addons/controls/OrbitControls.js'));
+ ({RoomEnvironment}=await import('three/addons/environments/RoomEnvironment.js'));
+ ({EffectComposer}=await import('three/addons/postprocessing/EffectComposer.js'));
+ ({RenderPass}=await import('three/addons/postprocessing/RenderPass.js'));
+ ({UnrealBloomPass}=await import('three/addons/postprocessing/UnrealBloomPass.js'));
+ ({OutputPass}=await import('three/addons/postprocessing/OutputPass.js'));
+}catch(e){ fatal('No se pudieron cargar las librerías 3D. Este simulador necesita conexión a internet la primera vez. Revisa la conexión y recarga la página.'); throw e; }
+
+try{ init(); }catch(e){ console.error(e); fatal('Tu navegador no pudo crear la escena 3D (WebGL). Prueba con Chrome, Edge o Firefox actualizados.'); throw e; }
+
+function init(){
+/* ============================================================
+   ESCENA, CÁMARA, LUCES
+   ============================================================ */
+const wrap=$('#viewport');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true});
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled=true;
+wrap.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x0a1120,20,48);
+
+/* Fondo degradado con brillos */
+{
+ const c=document.createElement('canvas'); c.width=c.height=512; const g=c.getContext('2d');
+ const lin=g.createLinearGradient(0,0,0,512); lin.addColorStop(0,'#0e1b33'); lin.addColorStop(.55,'#0a1322'); lin.addColorStop(1,'#120e1c');
+ g.fillStyle=lin; g.fillRect(0,0,512,512);
+ let r=g.createRadialGradient(160,120,10,160,120,330); r.addColorStop(0,'rgba(56,189,248,0.18)'); r.addColorStop(1,'rgba(56,189,248,0)');
+ g.fillStyle=r; g.fillRect(0,0,512,512);
+ r=g.createRadialGradient(410,420,10,410,420,310); r.addColorStop(0,'rgba(244,114,182,0.16)'); r.addColorStop(1,'rgba(244,114,182,0)');
+ g.fillStyle=r; g.fillRect(0,0,512,512);
+ const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; scene.background=tex;
+}
+
+const camera=new THREE.PerspectiveCamera(45,1,0.1,120);
+camera.position.set(6.8,5.2,11.2);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=.07;
+controls.minDistance=3.5; controls.maxDistance=32;
+controls.minPolarAngle=.05; controls.maxPolarAngle=1.52;
+controls.target.set(0,2.5,0);
+controls.autoRotateSpeed=.7;
+
+/* Entorno para reflejos */
+{
+ const pm=new THREE.PMREMGenerator(renderer);
+ scene.environment=pm.fromScene(new RoomEnvironment(),.04).texture; pm.dispose();
+}
+
+/* Luces dramáticas */
+scene.add(new THREE.HemisphereLight(0xa5c8ff,0x2d1824,.55));
+const key=new THREE.DirectionalLight(0xfff4e6,1.65);
+key.position.set(6,9,7); key.castShadow=true;
+key.shadow.mapSize.set(1024,1024);
+key.shadow.camera.left=key.shadow.camera.bottom=-9;
+key.shadow.camera.right=key.shadow.camera.top=9;
+key.shadow.camera.near=1; key.shadow.camera.far=32; key.shadow.bias=-.0005;
+scene.add(key);
+const rim=new THREE.DirectionalLight(0x38bdf8,1.2); rim.position.set(-7,4,-6); scene.add(rim);
+const fill=new THREE.PointLight(0xf472b6,.6,24); fill.position.set(-4,1.5,6); scene.add(fill);
+const exchangeLight=new THREE.PointLight(0x5eead4,0,8,2); exchangeLight.position.set(0,2.8,.4); scene.add(exchangeLight);
+
+/* Post-procesado (bloom) */
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(800,600),.42,.4,.78);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ============================================================
+   MATERIALES Y UTILIDADES
+   ============================================================ */
+const cutPlane=new THREE.Plane(new THREE.Vector3(0,0,-1),.15);
+const allMats=[],clipMats=[];
+function M(opts,clip=false){
+ const m=new THREE.MeshStandardMaterial(Object.assign({envMapIntensity:.55},opts));
+ m.userData.baseEmissive=m.emissive.getHex(); m.userData.baseEI=m.emissiveIntensity;
+ allMats.push(m);
+ if(clip){clipMats.push(m); m.clippingPlanes=[cutPlane]; m.side=THREE.DoubleSide;}
+ return m;
+}
+function mesh(geo,mat,parent,x=0,y=0,z=0,shadow=true){
+ const o=new THREE.Mesh(geo,mat); o.position.set(x,y,z);
+ o.castShadow=shadow; parent.add(o); return o;
+}
+const softTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+ const r=g.createRadialGradient(32,32,0,32,32,30); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.4,'rgba(255,255,255,.6)'); r.addColorStop(1,'rgba(255,255,255,0)');
+ g.fillStyle=r; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+
+/* Registro de piezas para despiece */
+const lungSystem=new THREE.Group(); scene.add(lungSystem);
+const parts=[];
+function part(id,base,offset){
+ const g=new THREE.Group(); g.position.copy(base); g.userData.partId=id; lungSystem.add(g);
+ const rec={id,group:g,base:base.clone(),offset:offset.clone(),mats:[]};
+ parts.push(rec); return rec;
+}
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+
+/* ============================================================
+   CONSTRUCCIÓN ANATÓMICA DEL SISTEMA RESPIRATORIO
+   ============================================================ */
+/* --- Tráquea con anillos cartilaginosos --- */
+const trachRec=part('traquea',V(0,4.85,0),V(0,2.1,0));
+{
+ const tubeMat=M({color:0x7dd3fc,roughness:.45,metalness:.1,transparent:true,opacity:.75});
+ const ringMat=M({color:0xbae6fd,roughness:.35,metalness:.25});
+ mesh(new THREE.CylinderGeometry(.28,.28,1.9,28,1,false),tubeMat,trachRec.group,0,0,0,false);
+ for(let i=0;i<8;i++){
+  const y=-.8+i*.23;
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.295,.038,10,32),ringMat);
+  ring.rotation.x=Math.PI/2; ring.position.set(0,y,0); ring.castShadow=true;
+  trachRec.group.add(ring);
+ }
+}
+
+/* --- Bronquios principales (izquierdo y derecho en pantalla) --- */
+const bronRec=part('bronquios',V(0,3.82,0),V(0,1.25,0));
+{
+ const bMat=M({color:0x60a5fa,roughness:.4,metalness:.2});
+ const cMat=M({color:0x93c5fd,roughness:.35,metalness:.25});
+ const lBron=new THREE.Mesh(new THREE.CylinderGeometry(.19,.16,1.25,20),bMat);
+ lBron.position.set(-.62,-.35,0); lBron.rotation.z=-.62; lBron.castShadow=true; bronRec.group.add(lBron);
+ const rBron=new THREE.Mesh(new THREE.CylinderGeometry(.19,.16,1.2,20),bMat);
+ rBron.position.set(.62,-.33,0); rBron.rotation.z=.62; rBron.castShadow=true; bronRec.group.add(rBron);
+ for(let i=0;i<3;i++){
+  const t=.25+i*.28;
+  const rl=new THREE.Mesh(new THREE.TorusGeometry(.175,.028,8,24),cMat);
+  rl.position.set(-t*1.05,-t*.65,0); rl.rotation.set(Math.PI/2,0,-.62); bronRec.group.add(rl);
+  const rr=new THREE.Mesh(new THREE.TorusGeometry(.175,.028,8,24),cMat);
+  rr.position.set(t*1.05,-t*.65,0); rr.rotation.set(Math.PI/2,0,.62); bronRec.group.add(rr);
+ }
+}
+
+/* --- Bronquiolos (ramificaciones internas) --- */
+const brioRec=part('bronquiolos',V(0,3.2,0),V(0,.55,0));
+{
+ const brMat=M({color:0x818cf8,roughness:.45,metalness:.15});
+ const branches=[
+  [-.95,-.55,.15,.55,-.85],[ -1.25,-1.15,-.1,.45,.65 ],[ -.75,-1.35,.2,.4,.35 ],
+  [ .95,-.55,-.15,.55,.85 ],[ 1.25,-1.15,.1,.45,-.65 ],[ .75,-1.35,-.2,.4,-.35 ],
+  [ -1.1,-.85,.35,.42,.5 ],[ 1.1,-.85,-.35,.42,-.5 ]
+ ];
+ for(const [x,y,z,len,rz] of branches){
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(.065,.045,len,12),brMat);
+  m.position.set(x,y,z); m.rotation.z=rz; m.castShadow=true; brioRec.group.add(m);
+ }
+}
+
+/* --- Pulmón derecho anatómico (3 lóbulos: superior, medio, inferior) --- */
+const rightLungRec=part('pulmon_derecho',V(-1.25,2.45,0),V(-2.2,.25,0));
+const rightLungPivot=new THREE.Group(); rightLungRec.group.add(rightLungPivot);
+const lungMatR=M({color:0xf472b6,roughness:.58,metalness:.05,transparent:true,opacity:.72},true);
+{
+ const upper=new THREE.Mesh(new THREE.SphereGeometry(.78,28,24),lungMatR);
+ upper.scale.set(.85,.95,.82); upper.position.set(.05,.62,0); upper.castShadow=true; rightLungPivot.add(upper);
+ const mid=new THREE.Mesh(new THREE.SphereGeometry(.82,28,24),lungMatR);
+ mid.scale.set(.95,.68,.88); mid.position.set(0,.02,.04); mid.castShadow=true; rightLungPivot.add(mid);
+ const lower=new THREE.Mesh(new THREE.CylinderGeometry(.68,.92,1.15,28),lungMatR);
+ lower.scale.set(1.02,1,.92); lower.position.set(0,-.72,0); lower.castShadow=true; rightLungPivot.add(lower);
+ const baseCap=new THREE.Mesh(new THREE.SphereGeometry(.9,28,16),lungMatR);
+ baseCap.scale.set(1.02,.32,.92); baseCap.position.set(0,-1.28,0); rightLungPivot.add(baseCap);
+}
+
+/* --- Pulmón izquierdo anatómico (2 lóbulos: superior e inferior) --- */
+const leftLungRec=part('pulmon_izquierdo',V(1.25,2.45,0),V(2.2,.25,0));
+const leftLungPivot=new THREE.Group(); leftLungRec.group.add(leftLungPivot);
+const lungMatL=M({color:0xfb7185,roughness:.58,metalness:.05,transparent:true,opacity:.72},true);
+{
+ const upper=new THREE.Mesh(new THREE.SphereGeometry(.76,28,24),lungMatL);
+ upper.scale.set(.84,.98,.82); upper.position.set(-.05,.62,0); upper.castShadow=true; leftLungPivot.add(upper);
+ const lower=new THREE.Mesh(new THREE.CylinderGeometry(.66,.88,1.45,28),lungMatL);
+ lower.scale.set(.98,1,.9); lower.position.set(0,-.55,0); lower.castShadow=true; leftLungPivot.add(lower);
+ const baseCap=new THREE.Mesh(new THREE.SphereGeometry(.86,28,16),lungMatL);
+ baseCap.scale.set(.98,.32,.9); baseCap.position.set(0,-1.26,0); leftLungPivot.add(baseCap);
+}
+
+/* --- Alvéolos pulmonares (racimos) --- */
+const alvRec=part('alveolos',V(0,2.35,.15),V(0,.2,1.9));
+const alvMat=M({color:0x5eead4,emissive:0x14b8a6,emissiveIntensity:.28,roughness:.4,metalness:.1});
+{
+ const clusters=[
+  [-1.25,2.85,.15],[-1.55,2.35,.25],[-.95,2.2,.2],[-1.35,1.75,.15],
+  [1.25,2.85,.15],[1.55,2.35,.25],[.95,2.2,.2],[1.35,1.75,.15]
+ ];
+ for(const [cx,cy,cz] of clusters){
+  const g=new THREE.Group(); g.position.set(cx-0,cy-2.35,cz-.15);
+  const offsets=[[0,0,0],[.14,.1,.08],[-.14,.08,-.06],[.08,-.13,.1],[-.1,-.12,-.08],[0,.15,-.1]];
+  for(const [ox,oy,oz] of offsets){
+   const s=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12),alvMat);
+   s.position.set(ox,oy,oz); s.castShadow=true; g.add(s);
+  }
+  alvRec.group.add(g);
+ }
+}
+
+/* --- Red capilar pulmonar --- */
+const capRec=part('capilares',V(0,2.35,.28),V(0,-.35,2.45));
+const capMat=M({color:0xe11d48,emissive:0x9f1239,emissiveIntensity:.22,roughness:.35,metalness:.15});
+{
+ const loops=[
+  [-1.25,2.85,.28],[-1.55,2.35,.35],[-1.35,1.75,.28],
+  [1.25,2.85,.28],[1.55,2.35,.35],[1.35,1.75,.28]
+ ];
+ for(const [x,y,z] of loops){
+  const t1=new THREE.Mesh(new THREE.TorusGeometry(.22,.026,8,20),capMat);
+  t1.position.set(x,y-2.35,z-.28); t1.rotation.set(.4,.5,0); capRec.group.add(t1);
+  const t2=new THREE.Mesh(new THREE.TorusGeometry(.18,.022,8,20),capMat);
+  t2.position.set(x+.06,y-2.4,z-.25); t2.rotation.set(-.5,.3,.7); capRec.group.add(t2);
+ }
+}
+
+/* --- Diafragma (cúpula muscular que sube y baja) --- */
+const diaRec=part('diafragma',V(0,.95,0),V(0,-1.45,0));
+const diaMat=M({color:0xfbbf24,emissive:0xd97706,emissiveIntensity:.15,roughness:.55,metalness:.1});
+{
+ const dome=new THREE.Mesh(new THREE.SphereGeometry(2.25,36,20,0,Math.PI*2,0,Math.PI*.52),diaMat);
+ dome.scale.set(1.05,.38,.78); dome.castShadow=true; diaRec.group.add(dome);
+ const rimT=new THREE.Mesh(new THREE.TorusGeometry(2.25,.08,10,48),diaMat);
+ rimT.rotation.x=Math.PI/2; rimT.scale.set(1.05,.78,1); diaRec.group.add(rimT);
+}
+
+/* --- Caja torácica (costillas) --- */
+const ribRec=part('caja_toracica',V(0,2.55,0),V(0,0,-2.3));
+const ribMat=M({color:0xcbd5e1,roughness:.45,metalness:.25,transparent:true,opacity:.48},true);
+{
+ const sternum=new THREE.Mesh(new THREE.BoxGeometry(.22,2.1,.12),ribMat);
+ sternum.position.set(0,.1,1.02); ribRec.group.add(sternum);
+ const spine=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,2.6,16),ribMat);
+ spine.position.set(0,.05,-.95); ribRec.group.add(spine);
+ for(let i=0;i<7;i++){
+  const y=.85-i*.28;
+  const rx=1.45+Math.sin((i/6)*Math.PI)*.55;
+  const rz=.92+Math.sin((i/6)*Math.PI)*.25;
+  const rib=new THREE.Mesh(new THREE.TorusGeometry(1,.055,10,36),ribMat);
+  rib.rotation.x=Math.PI/2; rib.rotation.y=.08*(i<3?-1:1);
+  rib.scale.set(rx,rz,1); rib.position.set(0,y,0); ribRec.group.add(rib);
+ }
+}
+
+/* --- Plataforma y pedestal (no son piezas anatómicas) --- */
+{
+ const plat=new THREE.Mesh(new THREE.CylinderGeometry(6.5,6.8,.14,64),
+  new THREE.MeshStandardMaterial({color:0x0d1728,roughness:.95,metalness:.1}));
+ plat.position.y=-1.4; plat.receiveShadow=true; scene.add(plat);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(6.3,.03,8,90),
+  new THREE.MeshStandardMaterial({color:0x38bdf8,emissive:0x38bdf8,emissiveIntensity:.75,roughness:.5}));
+ ring.rotation.x=Math.PI/2; ring.position.y=-1.32; scene.add(ring);
+ const grid=new THREE.GridHelper(34,34,0x1c2c48,0x131f36); grid.position.y=-1.46; scene.add(grid);
+ const ped=new THREE.Mesh(new THREE.BoxGeometry(2.1,.75,1.6),
+  new THREE.MeshStandardMaterial({color:0x1a2436,roughness:.7,metalness:.4}));
+ ped.position.y=-.98; ped.castShadow=true; scene.add(ped);
+ const stripe=new THREE.Mesh(new THREE.BoxGeometry(2.1,.07,.03),
+  new THREE.MeshStandardMaterial({color:0xf472b6,emissive:0xf472b6,emissiveIntensity:.5}));
+ stripe.position.set(0,-.72,.81); scene.add(stripe);
+}
+
+/* Recopilar materiales por pieza (para resaltado) */
+for(const p of parts){
+ p.group.traverse(o=>{ if(o.isMesh && !o.userData.noHL){ o.userData.partId=p.id; if(!p.mats.includes(o.material)) p.mats.push(o.material);} });
+}
+const pickables=[];
+lungSystem.traverse(o=>{ if(o.isMesh && !o.userData.noPick) pickables.push(o); });
+
+/* ============================================================
+   PARTÍCULAS (aire con O₂ entrando / aire con CO₂ saliendo + polvo)
+   ============================================================ */
+const airInCurve=new THREE.CatmullRomCurve3([V(0,6.2,0),V(0,4.8,0),V(0,3.85,0),V(-1.1,2.85,.15),V(-1.35,2.25,.2)]);
+const airOutCurve=new THREE.CatmullRomCurve3([V(1.35,2.25,.2),V(1.1,2.85,.15),V(0,3.85,0),V(0,4.8,0),V(0,6.3,0)]);
+
+function makeFlow(curve,color,max,size,op){
+ const geo=new THREE.BufferGeometry();
+ const pos=new Float32Array(max*3); pos.fill(-999);
+ geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const mat=new THREE.PointsMaterial({map:softTex,color,size,transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending});
+ const pts=new THREE.Points(geo,mat); pts.frustumCulled=false; scene.add(pts);
+ return {curve,geo,pos,mat,list:[],max,acc:0,pts};
+}
+const flowO2=makeFlow(airInCurve,0x7dd3fc,85,.11,.85);
+const flowCO2=makeFlow(airOutCurve,0xf9a8d4,85,.11,.75);
+
+function updateFlow(f,dt,activeAmt,e){
+ const speedScale=.55+state.rpm/32;
+ if(activeAmt>.08 && state.playing && e<.35){
+  f.acc+=dt*(14+state.rpm*.6)*activeAmt;
+  while(f.acc>=1 && f.list.length<f.max){
+   f.acc--;
+   f.list.push({t:0,sp:.75+Math.random()*.45,jx:(Math.random()-.5)*.22,jy:(Math.random()-.5)*.15,jz:(Math.random()-.5)*.22});
+  }
+  if(f.acc>1) f.acc=1;
+ }
+ let n=0; const v=new THREE.Vector3();
+ for(let i=f.list.length-1;i>=0;i--){
+  const p=f.list[i]; p.t+=p.sp*speedScale*dt;
+  if(p.t>=1){ f.list.splice(i,1); continue; }
+  f.curve.getPointAt(p.t,v);
+  f.pos[n*3]=v.x+p.jx*p.t; f.pos[n*3+1]=v.y+p.jy*p.t; f.pos[n*3+2]=v.z+p.jz; n++;
+ }
+ for(let i=n;i<f.max;i++){ f.pos[i*3+1]=-999; }
+ f.geo.setDrawRange(0,n); f.geo.attributes.position.needsUpdate=true;
+ f.mat.opacity=(f===flowO2?.85:.72)*(1-e);
+}
+
+/* Polvo ambiental */
+const DUST_MAX=120;
+const dustGeo=new THREE.BufferGeometry();
+const dustPos=new Float32Array(DUST_MAX*3); const dustSeed=[];
+for(let i=0;i<DUST_MAX;i++){ dustSeed.push({x:(Math.random()-.5)*16,y:-1.2+Math.random()*10,z:(Math.random()-.5)*16,s:Math.random()*6.28,v:.1+Math.random()*.2}); }
+dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3));
+const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({map:softTex,color:0x7dd3fc,size:.06,transparent:true,opacity:.28,depthWrite:false,blending:THREE.AdditiveBlending}));
+dust.frustumCulled=false; scene.add(dust);
+let dustCount=80;
+
+/* ============================================================
+   SONIDO PROCEDURAL (WebAudio — respiración suave)
+   ============================================================ */
+const S={ctx:null,master:null,humOsc:null,humGain:null,noiseBuf:null};
+function soundEnsure(){
+ if(!S.ctx){
+  try{
+   const ctx=new (window.AudioContext||window.webkitAudioContext)(); S.ctx=ctx;
+   S.master=ctx.createGain(); S.master.gain.value=state.sound?.45:0; S.master.connect(ctx.destination);
+   const buf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
+   const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; S.noiseBuf=buf;
+   S.humOsc=ctx.createOscillator(); S.humOsc.type='sine'; S.humOsc.frequency.value=62;
+   const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=160;
+   S.humGain=ctx.createGain(); S.humGain.gain.value=0;
+   S.humOsc.connect(lp); lp.connect(S.humGain); S.humGain.connect(S.master); S.humOsc.start();
+  }catch(e){}
+ }
+ if(S.ctx && S.ctx.state==='suspended') S.ctx.resume();
+}
+function soundBreath(inhale){
+ if(!S.ctx||!state.sound||!state.playing) return;
+ const ctx=S.ctx,t=ctx.currentTime;
+ const src=ctx.createBufferSource(); src.buffer=S.noiseBuf;
+ const bp=ctx.createBiquadFilter(); bp.type='bandpass';
+ bp.frequency.setValueAtTime(inhale?320:520,t);
+ bp.frequency.exponentialRampToValueAtTime(inhale?640:240,t+.85);
+ bp.Q.value=1.4;
+ const g=ctx.createGain();
+ g.gain.setValueAtTime(.0001,t);
+ g.gain.linearRampToValueAtTime(inhale?.12:.09,t+.25);
+ g.gain.exponentialRampToValueAtTime(.0008,t+1.1);
+ src.connect(bp); bp.connect(g); g.connect(S.master); src.start(t); src.stop(t+1.15);
+}
+function soundExchangeChime(){
+ if(!S.ctx||!state.sound) return;
+ const ctx=S.ctx,t=ctx.currentTime;
+ const o=ctx.createOscillator(); o.type='sine';
+ o.frequency.setValueAtTime(392,t); o.frequency.exponentialRampToValueAtTime(523.25,t+.18);
+ const g=ctx.createGain(); g.gain.setValueAtTime(.08,t); g.gain.exponentialRampToValueAtTime(.0008,t+.24);
+ o.connect(g); g.connect(S.master); o.start(t); o.stop(t+.25);
+}
+function soundUpdate(){
+ if(!S.ctx) return;
+ S.humOsc.frequency.setTargetAtTime(52+state.rpm*.9,S.ctx.currentTime,.15);
+ S.humGain.gain.setTargetAtTime(state.playing?.025:0,S.ctx.currentTime,.2);
+}
+window.addEventListener('pointerdown',soundEnsure,{once:true});
+window.addEventListener('keydown',soundEnsure,{once:true});
+
+/* ============================================================
+   ETIQUETAS HTML (en español) + LÍNEAS GUÍA
+   ============================================================ */
+const labelsLayer=$('#labelsLayer'),leaderSvg=$('#leaderSvg');
+const labelRecs=[];
+function addLabel(id,parent,local,dx,dy){
+ const anchor=new THREE.Object3D(); anchor.position.copy(local); parent.add(anchor);
+ const color=PARTS[id].color;
+ const pill=document.createElement('button'); pill.className='pill'; pill.style.setProperty('--pc',color);
+ pill.innerHTML=`<i></i>${PARTS[id].name}`; pill.dataset.part=id;
+ pill.addEventListener('click',ev=>{ev.stopPropagation(); selectPart(state.selected===id?null:id);});
+ labelsLayer.appendChild(pill);
+ const ns='http://www.w3.org/2000/svg';
+ const line=document.createElementNS(ns,'line'); line.setAttribute('stroke',color); line.setAttribute('stroke-width','1'); line.setAttribute('opacity','.55');
+ const dot=document.createElementNS(ns,'circle'); dot.setAttribute('r','3'); dot.setAttribute('fill',color);
+ leaderSvg.appendChild(line); leaderSvg.appendChild(dot);
+ labelRecs.push({id,anchor,pill,line,dot,dx,dy});
+}
+addLabel('traquea',trachRec.group,V(.25,.35,0),88,-16);
+addLabel('bronquios',bronRec.group,V(0,-.25,0),0,-38);
+addLabel('bronquiolos',brioRec.group,V(-1.1,-.8,0),-92,-12);
+addLabel('pulmon_derecho',rightLungRec.group,V(-.5,.35,0),-102,-24);
+addLabel('pulmon_izquierdo',leftLungRec.group,V(.5,.35,0),102,-24);
+addLabel('alveolos',alvRec.group,V(-1.35,.25,.2),-96,16);
+addLabel('capilares',capRec.group,V(1.35,-.2,.2),96,18);
+addLabel('diafragma',diaRec.group,V(0,-.15,.9),0,42);
+addLabel('caja_toracica',ribRec.group,V(1.45,.6,.2),98,-6);
+
+let vw=800,vh=600;
+const projV=new THREE.Vector3();
+function updateLabels(){
+ if(!state.labels){ labelsLayer.style.display='none'; return; }
+ labelsLayer.style.display='block';
+ for(const r of labelRecs){
+  r.anchor.getWorldPosition(projV); projV.project(camera);
+  const behind=projV.z>1;
+  const x=(projV.x*.5+.5)*vw, y=(-projV.y*.5+.5)*vh;
+  const off=behind||x<-60||x>vw+60||y<-40||y>vh+40;
+  r.pill.style.display=off?'none':'flex';
+  r.line.style.display=r.dot.style.display=off?'none':'block';
+  if(off) continue;
+  const px=x+r.dx, py=y+r.dy;
+  r.pill.style.transform=`translate(${px}px,${py}px) translate(-50%,-50%)`;
+  r.line.setAttribute('x1',x); r.line.setAttribute('y1',y); r.line.setAttribute('x2',px); r.line.setAttribute('y2',py);
+  r.dot.setAttribute('cx',x); r.dot.setAttribute('cy',y);
+  r.pill.classList.toggle('active',state.selected===r.id);
+ }
+}
+
+/* ============================================================
+   SELECCIÓN / RESALTADO DE ESTRUCTURAS
+   ============================================================ */
+const raycaster=new THREE.Raycaster(); const pointer=new THREE.Vector2();
+let downPos=null,downTime=0;
+function restoreMats(rec){ for(const m of rec.mats){ m.emissive.setHex(m.userData.baseEmissive); m.emissiveIntensity=m.userData.baseEI; } }
+function selectPart(id){
+ if(state.selected){ const old=parts.find(p=>p.id===state.selected); if(old) restoreMats(old); }
+ state.selected=id;
+ document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.part===id));
+ const card=$('#infoCard');
+ if(id){
+  const p=PARTS[id];
+  card.style.setProperty('--ic',p.color);
+  $('#infoName').textContent=p.name; $('#infoDesc').textContent=p.desc;
+  card.classList.add('show');
+ }else card.classList.remove('show');
+}
+$('#infoClose').addEventListener('click',()=>selectPart(null));
+function pickAt(cx,cy){
+ const rect=renderer.domElement.getBoundingClientRect();
+ pointer.x=((cx-rect.left)/rect.width)*2-1; pointer.y=-((cy-rect.top)/rect.height)*2+1;
+ raycaster.setFromCamera(pointer,camera);
+ const hits=raycaster.intersectObjects(pickables,false);
+ for(const h of hits){ if(!h.object.visible) continue;
+  let o=h.object; while(o && !o.userData.partId) o=o.parent;
+  if(o) return o.userData.partId;
+ }
+ return null;
+}
+renderer.domElement.addEventListener('pointerdown',e=>{downPos=[e.clientX,e.clientY];downTime=performance.now();});
+renderer.domElement.addEventListener('pointerup',e=>{
+ if(!downPos) return;
+ const d=Math.hypot(e.clientX-downPos[0],e.clientY-downPos[1]);
+ if(d<6 && performance.now()-downTime<450){ const id=pickAt(e.clientX,e.clientY); selectPart(id===state.selected?null:id); }
+ downPos=null;
+});
+let lastMove=null,pointerMoved=false;
+renderer.domElement.addEventListener('pointermove',e=>{lastMove=[e.clientX,e.clientY];pointerMoved=true;});
+function updateHover(t){
+ if(pointerMoved && lastMove){
+  pointerMoved=false;
+  const id=pickAt(lastMove[0],lastMove[1]);
+  if(id!==state.hovered){
+   if(state.hovered && state.hovered!==state.selected){ const old=parts.find(p=>p.id===state.hovered); if(old) restoreMats(old); }
+   state.hovered=id;
+   renderer.domElement.style.cursor=id?'pointer':'grab';
+   if(id && id!==state.selected){ const rec=parts.find(p=>p.id===id);
+    for(const m of rec.mats){ m.emissive.set(PARTS[id].color); m.emissiveIntensity=.16; } }
+  }
+ }
+ if(state.selected){
+  const rec=parts.find(p=>p.id===state.selected);
+  const pulse=.32+.22*Math.sin(t*5.5);
+  for(const m of rec.mats){ m.emissive.set(PARTS[state.selected].color); m.emissiveIntensity=pulse; }
+ }
+}
+
+/* ============================================================
+   INTERFAZ: BINDINGS
+   ============================================================ */
+function setRange(el){ el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%'); }
+document.querySelectorAll('input[type=range]').forEach(setRange);
+
+function syncPlayUI(){
+ $('#icPause').style.display=state.playing?'block':'none';
+ $('#icPlay').style.display=state.playing?'none':'block';
+ $('#playLabel').textContent=state.playing?'Pausar':'Reproducir';
+}
+$('#playBtn').addEventListener('click',()=>{state.playing=!state.playing;state.stepMode=false;syncPlayUI();});
+
+const PHASE_RANGES=[[0,.4],[.4,.6],[.6,1]];
+let progTween=null;
+function tweenProgress(to,dur,step=false){
+ state.stepMode=step; if(step){state.playing=false;syncPlayUI();}
+ progTween={from:state.progress,to,start:performance.now(),dur:dur*1000};
+}
+$('#stepBtn').addEventListener('click',()=>{
+ const curPhase=state.progress<.4?0:state.progress<.6?1:2;
+ const nextPhase=(curPhase+1)%3;
+ const target=PHASE_RANGES[nextPhase][0]+.02;
+ if(nextPhase===0 && curPhase===2) state.cycles++;
+ progTween={from:state.progress,to:target,start:performance.now(),dur:900,wrapZero:nextPhase===0};
+ toast('Avanzando a la siguiente fase respiratoria');
+});
+document.querySelectorAll('.tl-seg').forEach(b=>b.addEventListener('click',()=>{
+ const i=parseInt(b.dataset.i);
+ tweenProgress(PHASE_RANGES[i][0]+.02,.7,false);
+}));
+
+$('#rpmSlider').addEventListener('input',e=>{
+ state.rpm=parseInt(e.target.value); setRange(e.target);
+ $('#rpmOut').textContent=state.rpm+' resp/min'; $('#rpmTxt').textContent=state.rpm+' RPM (resp/min)';
+});
+
+function syncExplodeUI(){
+ const armed=state.explodeTarget>.5;
+ $('#explodeBtn').classList.toggle('armed',armed);
+ $('#explodeBtn').setAttribute('aria-pressed',armed);
+ $('#explodeLabel').textContent=armed?'ARMAR SISTEMA':'DESPIECE ANATÓMICO';
+}
+$('#explodeBtn').addEventListener('click',()=>{
+ const to=state.explodeTarget>.5?0:1;
+ if(to===1){ state.wasPlaying=state.playing; state.playing=false; syncPlayUI(); toast('Despiece anatómico: estructuras separadas'); }
+ else { state.playing=state.wasPlaying; syncPlayUI(); toast('Sistema pulmonar reunido'); }
+ state.explodeTarget=to; syncExplodeUI();
+});
+$('#sepSlider').addEventListener('input',e=>{
+ const v=parseInt(e.target.value)/100; setRange(e.target);
+ state.explode=v; state.explodeTarget=v;
+ $('#sepOut').textContent=Math.round(v*100)+'%'; syncExplodeUI();
+});
+
+function applyCut(){
+ for(const m of clipMats){
+  m.clippingPlanes=state.cutaway?[cutPlane]:null;
+  m.opacity=state.cutaway?.58:.92;
+  m.needsUpdate=true;
+ }
+}
+$('#cutToggle').addEventListener('change',e=>{
+ state.cutaway=e.target.checked; applyCut();
+ toast(state.cutaway?'Corte alveolar / rayos X activado':'Vista sólida sin corte');
+});
+$('#labelsToggle').addEventListener('change',e=>{state.labels=e.target.checked;});
+$('#rotToggle').addEventListener('change',e=>{state.autoRot=e.target.checked;controls.autoRotate=state.autoRot;});
+
+function applyQuality(){
+ const q=state.quality;
+ const dpr=q==='alta'?Math.min(devicePixelRatio,2):q==='media'?Math.min(devicePixelRatio,1.5):1;
+ renderer.setPixelRatio(dpr); composer.setPixelRatio(dpr);
+ bloom.enabled=q!=='baja'; bloom.strength=q==='alta'?.48:.38;
+ const sh=q!=='baja'; renderer.shadowMap.enabled=sh; key.castShadow=sh;
+ const size=q==='alta'?2048:1024;
+ if(key.shadow.map){key.shadow.map.dispose();key.shadow.map=null;}
+ key.shadow.mapSize.set(size,size);
+ dustCount=q==='alta'?120:q==='media'?80:40;
+ for(const m of allMats) m.needsUpdate=true;
+ resize();
+}
+$('#qualitySel').addEventListener('change',e=>{state.quality=e.target.value;applyQuality();toast('Calidad: '+e.target.selectedOptions[0].text);});
+
+/* Cámara */
+let camTween=null;
+function camTo(pos,target,dur=.9){
+ camTween={fp:camera.position.clone(),tp:pos.clone(),ft:controls.target.clone(),tt:target.clone(),start:performance.now(),dur:dur*1000};
+}
+controls.addEventListener('start',()=>{camTween=null;});
+const explodeY=()=>2.5+1.8*state.explode;
+const views={
+ front:()=>camTo(V(0,explodeY()+.5,11.5+7.5*state.explode),V(0,explodeY(),0)),
+ side:()=>camTo(V(11.5+7.5*state.explode,explodeY()+.8,.5),V(0,explodeY(),0)),
+ top:()=>camTo(V(.4,explodeY()+12+6*state.explode,.4),V(0,explodeY(),0)),
+ iso:()=>camTo(V(6.8,explodeY()+2.7,11.2+7*state.explode),V(0,explodeY(),0))
+};
+document.querySelectorAll('.cam-btn').forEach(b=>b.addEventListener('click',()=>views[b.dataset.view]()));
+$('#centerBtn').addEventListener('click',()=>views.iso());
+$('#randomBtn').addEventListener('click',()=>{
+ const az=Math.random()*Math.PI*2,pol=.35+Math.random()*.85,d=9.5+Math.random()*6+7*state.explode;
+ const ty=explodeY();
+ camTo(V(Math.sin(az)*Math.sin(pol)*d,ty+Math.cos(pol)*d,Math.cos(az)*Math.sin(pol)*d),V(0,ty,0));
+ toast('¡Vista sorpresa! 🎲');
+});
+
+/* Sonido / pantalla completa */
+function syncSoundUI(){
+ $('#soundBtn').classList.toggle('off',!state.sound);
+ $('#soundBtn').setAttribute('aria-pressed',state.sound);
+ $('#soundLabel').textContent=state.sound?'Sonido':'Silencio';
+ if(S.ctx) S.master.gain.setTargetAtTime(state.sound?.45:0,S.ctx.currentTime,.05);
+}
+$('#soundBtn').addEventListener('click',()=>{soundEnsure();state.sound=!state.sound;syncSoundUI();toast(state.sound?'Sonido activado 🔊':'Sonido silenciado 🔇');});
+$('#fsBtn').addEventListener('click',()=>{
+ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){}
+});
+
+/* Reiniciar / captura */
+$('#resetBtn').addEventListener('click',resetAll);
+function resetAll(){
+ state.progress=0;state.cycles=0;state.rpm=16;state.playing=true;state.stepMode=false;
+ state.explode=0;state.explodeTarget=0;state.cutaway=true;state.labels=true;state.autoRot=false;
+ progTween=null; selectPart(null);
+ $('#rpmSlider').value=16;setRange($('#rpmSlider'));$('#rpmOut').textContent='16 resp/min';$('#rpmTxt').textContent='16 RPM (resp/min)';
+ $('#sepSlider').value=0;setRange($('#sepSlider'));$('#sepOut').textContent='0%';
+ $('#cutToggle').checked=true;$('#labelsToggle').checked=true;$('#rotToggle').checked=false;
+ controls.autoRotate=false; applyCut(); syncPlayUI(); syncExplodeUI();
+ camTo(V(6.8,5.2,11.2),V(0,2.5,0));
+ toast('Simulador reiniciado ⟳');
+}
+$('#shotBtn').addEventListener('click',()=>{
+ try{
+  const a=document.createElement('a'); a.download='pulmones-respiracion-3d.png';
+  a.href=renderer.domElement.toDataURL('image/png'); a.click();
+  const f=$('#flash'); f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),180);
+  toast('Imagen PNG descargada 📸');
+ }catch(e){ toast('No se pudo generar la captura'); }
+});
+
+/* Leyenda */
+{
+ const lg=$('#legend');
+ for(const id of LEGEND_ORDER){
+  const b=document.createElement('button'); b.className='chip'; b.dataset.part=id;
+  b.style.setProperty('--pc',PARTS[id].color);
+  b.innerHTML=`<i></i><span>${PARTS[id].name}</span>`;
+  b.addEventListener('click',()=>selectPart(state.selected===id?null:id));
+  lg.appendChild(b);
+ }
+}
+
+/* Atajos de teclado */
+window.addEventListener('keydown',e=>{
+ if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+ switch(e.key){
+  case ' ': e.preventDefault(); $('#playBtn').click(); break;
+  case 'e': case 'E': $('#explodeBtn').click(); break;
+  case 'ArrowRight': $('#stepBtn').click(); break;
+  case 'c': case 'C': $('#cutToggle').checked=!$('#cutToggle').checked; $('#cutToggle').dispatchEvent(new Event('change')); break;
+  case 'l': case 'L': $('#labelsToggle').checked=!$('#labelsToggle').checked; $('#labelsToggle').dispatchEvent(new Event('change')); break;
+  case 'r': case 'R': resetAll(); break;
+  case 'Escape': selectPart(null); break;
+ }
+});
+
+/* ============================================================
+   HUD (insignia, tarjeta, línea de tiempo)
+   ============================================================ */
+let lastPhase=-1;
+const segEls=[...document.querySelectorAll('.tl-seg')];
+function updatePhaseUI(i){
+ const s=STROKES[i];
+ const badge=$('#strokeBadge');
+ badge.style.setProperty('--sc',s.color);
+ $('#badgeNum').textContent=i+1;
+ $('#badgeName').childNodes[0].textContent=s.name.toUpperCase();
+ $('#badgeSub').textContent=`Fase ${i+1} de 3 · ${s.motion}`;
+ badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop');
+ const card=$('#strokeCard'); card.style.setProperty('--sc',s.color);
+ $('#scNum').textContent=i+1; $('#scName').textContent=s.name; $('#scSub').textContent=s.sub;
+ $('#scDesc').textContent=s.desc; $('#scTip').textContent=s.tip;
+ segEls.forEach((el,j)=>{ el.classList.toggle('active',j===i); el.classList.toggle('done',j<i); });
+ if(lastPhase!==-1){
+  if(i===0) soundBreath(true);
+  else if(i===1) soundExchangeChime();
+  else if(i===2) soundBreath(false);
+ }
+ lastPhase=i;
+}
+function updateHUD(){
+ const p=state.progress;
+ const i=p<.4?0:p<.6?1:2;
+ if(i!==lastPhase) updatePhaseUI(i);
+ const [a,b]=PHASE_RANGES[i];
+ const intra=clamp((p-a)/(b-a),0,1);
+ segEls[i].querySelector('.tl-fill').style.transform=`scaleX(${intra})`;
+ $('#tlMarker').style.left=(p*100)+'%';
+ $('#angleTxt').textContent=Math.round(p*100)+'%';
+ $('#lapTxt').textContent=i===0?'Inhalando (O₂)':i===1?'Difusión alveolar':'Exhalando (CO₂)';
+ $('#cyclesTxt').textContent=state.cycles;
+ const dead=$('#deadChip');
+ if(Math.abs(p-.4)<.025){ dead.style.visibility='visible'; dead.textContent='MAX O₂'; }
+ else if(Math.abs(p-.6)<.025){ dead.style.visibility='visible'; dead.textContent='INTERCAMBIO'; }
+ else dead.style.visibility='hidden';
+}
+
+/* ============================================================
+   CINEMÁTICA Y BUCLE PRINCIPAL
+   ============================================================ */
+function setProgress(next){
+ const prev=state.progress;
+ if(next>=1){
+  state.progress=next%1;
+  state.cycles++;
+  if(state.explode<.35) soundBreath(true);
+ }else{
+  state.progress=clamp(next,0,.9999);
+ }
+ if(prev<.4 && state.progress>=.4 && state.explode<.35) soundExchangeChime();
+}
+
+const tmpV=new THREE.Vector3();
+function applyKinematics(t){
+ const e=smooth(clamp(state.explode,0,1));
+ const p=state.progress;
+
+ /* Curva de expansión pulmonar: 0..0.4 sube a 1, 0.4..0.6 sostiene (~1), 0.6..1 baja a 0 */
+ let breath=0;
+ if(p<.4) breath=smooth(p/.4);
+ else if(p<.6) breath=1-.04*Math.sin(((p-.4)/.2)*Math.PI);
+ else breath=1-smooth((p-.6)/.4);
+
+ for(const rec of parts){
+  rec.group.position.copy(rec.base).addScaledVector(rec.offset,e);
+ }
+
+ /* Diafragma desciende al inhalar */
+ diaRec.group.position.y=lerp(.95,.52,breath)+diaRec.offset.y*e;
+
+ /* Expansión de lóbulos pulmonares y caja torácica */
+ const sx=lerp(1,1.16,breath);
+ const sy=lerp(1,1.14,breath);
+ const sz=lerp(1,1.15,breath);
+ rightLungPivot.scale.set(sx,sy,sz);
+ leftLungPivot.scale.set(sx,sy,sz);
+ ribRec.group.scale.set(lerp(1,1.08,breath),1,lerp(1,1.08,breath));
+
+ /* Brillo de intercambio gaseoso en fase 2 (0.4 - 0.6) */
+ const exPulse=(p>=.38&&p<=.62)?Math.sin(((p-.38)/.24)*Math.PI):0;
+ alvMat.emissiveIntensity=.25+exPulse*1.15;
+ capMat.emissiveIntensity=.2+exPulse*.75;
+ exchangeLight.intensity=exPulse*5.5*(1-e);
+
+ const inAmt=(p<.42)?breath:0;
+ const outAmt=(p>.58)?(1-breath):0;
+ return {inAmt,outAmt,e};
+}
+
+/* Redimensionado */
+function resize(){
+ const r=wrap.getBoundingClientRect();
+ vw=Math.max(1,r.width); vh=Math.max(1,r.height);
+ renderer.setSize(vw,vh,false); composer.setSize(vw,vh);
+ camera.aspect=vw/vh; camera.updateProjectionMatrix();
+ leaderSvg.setAttribute('viewBox',`0 0 ${vw} ${vh}`);
+}
+new ResizeObserver(resize).observe(wrap);
+resize(); applyQuality(); applyCut();
+
+/* Entrada cinematográfica */
+camTo(V(6.8,5.2,11.2),V(0,2.5,0),1.5);
+setTimeout(()=>{const h=$('#hintChip'); if(h) h.style.opacity=.45;},10000);
+
+const clock=new THREE.Clock();
+let firstFrame=true,lastSep=-1;
+
+renderer.setAnimationLoop(()=>{
+ const dt=Math.min(clock.getDelta(),.05);
+ const t=clock.elapsedTime;
+ const now=performance.now();
+
+ if(progTween){
+  const k=clamp((now-progTween.start)/progTween.dur,0,1);
+  const val=lerp(progTween.from,progTween.to,easeIO(k));
+  if(progTween.wrapZero && val>=1){
+   state.progress=val-1;
+  }else{
+   state.progress=((val%1)+1)%1;
+  }
+  if(k>=1){ progTween=null; state.stepMode=false; }
+ }else if(state.playing){
+  setProgress(state.progress+(state.rpm/60)*dt);
+ }
+
+ /* Despiece + asistencia de encuadre */
+ const prevE=state.explode;
+ state.explode+=(state.explodeTarget-state.explode)*Math.min(1,dt*3.2);
+ if(Math.abs(state.explode-state.explodeTarget)<.001) state.explode=state.explodeTarget;
+ if(Math.abs(state.explode-prevE)>.0004 && !camTween){
+  const ty=2.5+1.8*state.explode;
+  controls.target.y+=(ty-controls.target.y)*Math.min(1,dt*3);
+  const want=12.2+7.5*state.explode;
+  tmpV.copy(camera.position).sub(controls.target);
+  const d=tmpV.length(),nd=lerp(d,want,Math.min(1,dt*2.2));
+  camera.position.copy(controls.target).addScaledVector(tmpV.normalize(),nd);
+ }
+ if(Math.abs(state.explode-lastSep)>.004){
+  lastSep=state.explode;
+  const pct=Math.round(state.explode*100);
+  $('#sepSlider').value=pct; setRange($('#sepSlider')); $('#sepOut').textContent=pct+'%';
+ }
+
+ if(camTween){
+  const k=clamp((now-camTween.start)/camTween.dur,0,1),ek=easeIO(k);
+  camera.position.lerpVectors(camTween.fp,camTween.tp,ek);
+  controls.target.lerpVectors(camTween.ft,camTween.tt,ek);
+  if(k>=1) camTween=null;
+ }
+ controls.update();
+
+ const {inAmt,outAmt,e}=applyKinematics(t);
+ updateFlow(flowO2,dt,inAmt,e);
+ updateFlow(flowCO2,dt,outAmt,e);
+
+ /* Polvo ambiental */
+ for(let i=0;i<dustCount;i++){ const s=dustSeed[i];
+  dustPos[i*3]=s.x+Math.sin(t*s.v+s.s)*.6;
+  dustPos[i*3+1]=s.y+Math.sin(t*s.v*.7+s.s*2)*.5;
+  dustPos[i*3+2]=s.z+Math.cos(t*s.v*.5+s.s)*.6;
+ }
+ dustGeo.setDrawRange(0,dustCount); dustGeo.attributes.position.needsUpdate=true;
+
+ updateHover(t);
+ updateLabels();
+ updateHUD();
+ soundUpdate();
+
+ if(state.quality==='baja') renderer.render(scene,camera);
+ else composer.render();
+
+ if(firstFrame){ firstFrame=false; $('#loader').classList.add('done'); }
+});
+
+syncPlayUI(); syncExplodeUI(); syncSoundUI(); updatePhaseUI(0);
+} /* fin init */
+</script>
+</body>
+</html>
